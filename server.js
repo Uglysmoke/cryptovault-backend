@@ -55,3 +55,11 @@ app.listen(PORT, () => {
   console.log(`🌐 API: http://localhost:${PORT}/api`);
   console.log(`📊 Health: http://localhost:${PORT}/api/health`);
 });
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    process.env.CLIENT_URL,
+    'https://cryptovault-frontend.vercel.app',
+  ],
+  credentials: true,
+}));
