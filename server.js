@@ -15,15 +15,17 @@ connectDB();
 const app = express();
 
 // ===== MIDDLEWARE =====
-app.use(helmet());
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://cryptovault-frontend-r2cd.vercel.app',
-    process.env.CLIENT_URL,
-  ].filter(Boolean),
-  credentials: true,
+app.use(helmet({
+  crossOriginResourcePolicy: false,
 }));
+
+// CORS — allow all origins for now to fix production
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -42,14 +44,21 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ===== 404 HANDLER =====
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+  });
 });
 
 // ===== ERROR HANDLER =====
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ success: false, message: 'Something went wrong' });
+  res.status(500).json({
+    success: false,
+    message: 'Something went wrong',
+  });
 });
 
 // ===== START SERVER =====
