@@ -234,7 +234,159 @@ const getInsuranceClaims = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+const getKYCList = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('kyc')
+      .select('*, users (email, wallet_id)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 
+const reviewKYC = async (req, res) => {
+  try {
+    const { kycId, status, reason } = req.body;
+    const { data: kycRecord, error: fetchError } = await supabase
+      .from('kyc').select('user_id').eq('id', kycId).single();
+    if (fetchError) throw fetchError;
+
+    const { data, error } = await supabase
+      .from('kyc')
+      .update({
+        status,
+        rejection_reason: reason || null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', kycId).select().single();
+    if (error) throw error;
+
+    // Notify user
+    const notifTitle = status === 'approved'
+      ? 'Identity Verified ✅'
+      : 'Verification Update';
+    const notifMsg = status === 'approved'
+      ? 'Your identity has been successfully verified.'
+      : `Your verification needs attention. Please check your KYC status.`;
+
+    await supabase.from('notifications').insert({
+      user_id: kycRecord.user_id,
+      title: notifTitle,
+      message: notifMsg,
+      type: 'kyc',
+    });
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const getStakes = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('stakes')
+      .select('*, users (email, wallet_id)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const reviewStake = async (req, res) => {
+  try {
+    const { stakeId, status } = req.body;
+    const { data: stakeRecord } = await supabase
+      .from('stakes').select('user_id, asset, amount')
+      .eq('id', stakeId).single();
+
+    const updateData = { status };
+    if (status === 'active') {
+      updateData.start_date = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from('stakes').update(updateData)
+      .eq('id', stakeId).select().single();
+    if (error) throw error;
+
+    // Notify user
+    const msg = status === 'active'
+      ? `Your stake of ${stakeRecord.amount} ${stakeRecord.asset} is now active and earning rewards.`
+      : `Your staking request for ${stakeRecord.amount} ${stakeRecord.asset} could not be processed.`;
+
+    await supabase.from('notifications').insert({
+      user_id: stakeRecord.user_id,
+      title: status === 'active' ? 'Stake Activated ✅' : 'Stake Update',
+      message: msg,
+      type: 'staking',
+    });
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const getInsurancePlans = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('insurance_plans')
+      .select('*, users (email, wallet_id)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const reviewInsurance = async (req, res) => {
+  try {
+    const { planId, status } = req.body;
+    const { data: planRecord } = await supabase
+      .from('insurance_plans').select('user_id, plan_name')
+      .eq('id', planId).single();
+
+    const { data, error } = await supabase
+      .from('insurance_plans').update({ status })
+      .eq('id', planId).select().single();
+    if (error) throw error;
+
+    const msg = status === 'active'
+      ? `Your ${planRecord.plan_name} insurance plan is now active.`
+      : `Your insurance plan request has been updated.`;
+
+    await supabase.from('notifications').insert({
+      user_id: planRecord.user_id,
+      title: status === 'active' ? 'Insurance Active ✅' : 'Insurance Update',
+      message: msg,
+      type: 'insurance',
+    });
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const sendNotification = async (req, res) => {
+  try {
+    const { userId, title, message } = req.body;
+    const { data, error } = await supabase.from('notifications').insert({
+      user_id: userId, title, message, type: 'info',
+    }).select().single();
+    if (error) throw error;
+    return res.status(201).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 module.exports = {
   adminLogin,
   getAllUsers,
@@ -245,4 +397,11 @@ module.exports = {
   getAddresses,
   updateAddress,
   getInsuranceClaims,
+  getKYCList,
+  reviewKYC,
+  getStakes,
+  reviewStake,
+  getInsurancePlans,
+  reviewInsurance,
+  sendNotification,
 };
